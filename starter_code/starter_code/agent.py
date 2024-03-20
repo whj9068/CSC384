@@ -28,27 +28,35 @@ def compute_heuristic(board, color): #not implemented, optional
     return 0 #change this!
 
 ############ MINIMAX ###############################
-def minimax_min_node(board, color, limit, caching = 0):
+def minimax_min_node(board, color, limit, caching=0):
     #IMPLEMENT (and replace the line below)
     if color == 1:
         opp_color = 2
     else:
         opp_color = 1
 
+    # Get possible moves for the current player, not the opponent.
     moves = get_possible_moves(board, opp_color)
     if len(moves) == 0 or limit == 0:
+        # No further moves to evaluate or depth limit reached, compute utility for the current state.
         best_move = None
         min_utility = compute_utility(board, color)
+        return (best_move, min_utility)
     else:
         best_move = None
         min_utility = float('inf')
         for move in moves:
+            # Play the move for the current player and evaluate.
             new_board = play_move(board, opp_color, move[0], move[1])
+            # Recursive call to evaluate the move, using the opponent's color for the next level.
             new_move = minimax_max_node(new_board, color, limit-1, caching)
+            # If the utility from this move is less than the current minimum, update the minimum.
             if new_move[1] < min_utility:
                 min_utility = new_move[1]
-                best_move = move        
+                best_move = move
+        
         return (best_move, min_utility)
+
 
 def minimax_max_node(board, color, limit, caching = 0): #returns highest possible utility
     #IMPLEMENT (and replace the line below)
@@ -57,20 +65,28 @@ def minimax_max_node(board, color, limit, caching = 0): #returns highest possibl
     else:
         opp_color = 1
 
-    moves = get_possible_moves(board, opp_color)
+    # Get possible moves for the current player, not the opponent.
+    moves = get_possible_moves(board, color)
     if len(moves) == 0 or limit == 0:
+        # No further moves to evaluate or depth limit reached, compute utility for the current state.
         best_move = None
         max_utility = compute_utility(board, color)
+        return (best_move, max_utility)
     else:
         best_move = None
         max_utility = float('-inf')
         for move in moves:
-            new_board = play_move(board, opp_color, move[0], move[1])
+            # Play the move for the current player and evaluate.
+            new_board = play_move(board, color, move[0], move[1])
+            # Recursive call to evaluate the move, using the opponent's color for the next level.
             new_move = minimax_min_node(new_board, opp_color, limit-1, caching)
+            # If the utility from this move is greater than the current maximum, update the maximum.
             if new_move[1] > max_utility:
                 max_utility = new_move[1]
                 best_move = move
+        
         return (best_move, max_utility)
+
 
 def select_move_minimax(board, color, limit, caching = 0):
     """
@@ -113,6 +129,8 @@ def alphabeta_min_node(board, color, alpha, beta, limit, caching = 0, ordering =
             if min_utility <= alpha:
                 return (best_move, min_utility)
             beta = min(beta, min_utility)
+            if alpha >= beta:
+                break
     return (best_move, min_utility)
 
 def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering = 0):
@@ -121,23 +139,27 @@ def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering =
         opp_color = 2
     else:
         opp_color = 1
-    
-    moves = get_possible_moves(board, opp_color)
+
+    # Generate and evaluate moves for the current player (color)
+    moves = get_possible_moves(board, color)
     if len(moves) == 0 or limit == 0:
         best_move = None
         max_utility = compute_utility(board, color)
+        return (best_move, max_utility)
     else:
         best_move = None
         max_utility = float('-inf')
         for move in moves:
-            new_board = play_move(board, opp_color, move[0], move[1])
-            new_move = alphabeta_min_node(new_board, opp_color, alpha, beta, limit-1, caching)
+            # Play the move for the current player and evaluate
+            new_board = play_move(board, color, move[0], move[1])
+            # Recursive call to evaluate the move, aiming to minimize the opponent's utility
+            new_move = alphabeta_min_node(new_board, color, alpha, beta, limit-1, caching)
             if new_move[1] > max_utility:
                 max_utility = new_move[1]
                 best_move = move
-            if max_utility >= beta:
-                return (best_move, max_utility)
             alpha = max(alpha, max_utility)
+            if alpha >= beta:
+                break
     return (best_move, max_utility)
 
 def select_move_alphabeta(board, color, limit, caching = 0, ordering = 0):
