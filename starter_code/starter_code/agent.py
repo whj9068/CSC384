@@ -9,6 +9,12 @@ import time
 # You can use the functions in othello_shared to write your AI
 from othello_shared import find_lines, get_possible_moves, get_score, play_move
 
+cache = {}
+
+def board_to_key(board):
+    # Flatten the board into a single tuple since tuples are hashable and can be used as dictionary keys
+    return tuple(item for row in board for item in row)
+
 def eprint(*args, **kwargs): #you can use this for debugging, as it will print to sterr and not stdout
     print(*args, file=sys.stderr, **kwargs)
     
@@ -27,8 +33,40 @@ def compute_heuristic(board, color): #not implemented, optional
     #IMPLEMENT
     return 0 #change this!
 
+def count_corner_captures(board, color):
+    rows = len(board)
+    cols = len(board[0]) if rows > 0 else 0
+    
+    # Dynamically determine corner positions based on board size
+    corners = [(0, 0), (0, cols-1), (rows-1, 0), (rows-1, cols-1)]    
+    captures = sum(1 for x, y in corners if board[x][y] == color)
+    return captures
+
+def count_mobility(board, color):
+    # Assuming get_possible_moves is a function that returns all legal moves for the given color
+    return len(get_possible_moves(board, color))
+
+def evaluate_move(board, move, color):
+    # Apply the move to a copy of the board
+    new_board = play_move(board, color, move[0], move[1])
+    
+    # Calculate the difference in corner captures as a result of this move
+    corner_captures = count_corner_captures(new_board, color) - count_corner_captures(board, color)
+    
+    # Calculate the change in mobility as a result of this move
+    mobility = count_mobility(new_board, color) - count_mobility(board, color)
+    
+    # Weight these factors (these weights can be adjusted based on strategy)
+    score = 10 * corner_captures + mobility
+    
+    return score
+
+
 ############ MINIMAX ###############################
 def minimax_min_node(board, color, limit, caching=0):
+    global cache
+    if caching and board_to_key(board) in cache:
+        return cache[board_to_key(board)]
     #IMPLEMENT (and replace the line below)
     if color == 1:
         opp_color = 2
@@ -54,12 +92,17 @@ def minimax_min_node(board, color, limit, caching=0):
             if new_move[1] < min_utility:
                 min_utility = new_move[1]
                 best_move = move
-        
+        if caching:
+            cache[board_to_key(board)] = (best_move, min_utility)
         return (best_move, min_utility)
 
 
 def minimax_max_node(board, color, limit, caching = 0): #returns highest possible utility
     #IMPLEMENT (and replace the line below)
+    global cache
+    if caching and board_to_key(board) in cache:
+        return cache[board_to_key(board)]
+    
     if color == 1:
         opp_color = 2
     else:
@@ -84,7 +127,8 @@ def minimax_max_node(board, color, limit, caching = 0): #returns highest possibl
             if new_move[1] > max_utility:
                 max_utility = new_move[1]
                 best_move = move
-        
+        if caching:
+            cache[board_to_key(board)] = (best_move, max_utility)
         return (best_move, max_utility)
 
 
@@ -108,12 +152,19 @@ def select_move_minimax(board, color, limit, caching = 0):
 ############ ALPHA-BETA PRUNING #####################
 def alphabeta_min_node(board, color, alpha, beta, limit, caching = 0, ordering = 0):
     #IMPLEMENT (and replace the line below)
+    global cache
+    if caching and board_to_key(board) in cache:
+        return cache[board_to_key(board)]
     if color == 1:
         opp_color = 2
     else:
         opp_color = 1
-
+    
     moves = get_possible_moves(board, opp_color)
+    
+    if ordering:
+        moves = sorted(moves, key=lambda move: evaluate_move(board, move, opp_color), reverse=False)
+
     if len(moves) == 0 or limit == 0:
         best_move = None
         min_utility = compute_utility(board, color)
@@ -131,10 +182,15 @@ def alphabeta_min_node(board, color, alpha, beta, limit, caching = 0, ordering =
             beta = min(beta, min_utility)
             if alpha >= beta:
                 break
+        if caching:
+            cache[board_to_key(board)] = (best_move, min_utility)
     return (best_move, min_utility)
 
 def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering = 0):
     #IMPLEMENT (and replace the line below)
+    global cache
+    if caching and board_to_key(board) in cache:
+        return cache[board_to_key(board)]
     if color == 1:
         opp_color = 2
     else:
@@ -142,6 +198,11 @@ def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering =
 
     # Generate and evaluate moves for the current player (color)
     moves = get_possible_moves(board, color)
+    
+    if ordering:
+        moves = sorted(moves, key=lambda move: evaluate_move(board, move, color), reverse=True)
+
+    
     if len(moves) == 0 or limit == 0:
         best_move = None
         max_utility = compute_utility(board, color)
@@ -160,6 +221,8 @@ def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering =
             alpha = max(alpha, max_utility)
             if alpha >= beta:
                 break
+        if caching:
+            cache[board_to_key(board)] = (best_move, max_utility)
     return (best_move, max_utility)
 
 def select_move_alphabeta(board, color, limit, caching = 0, ordering = 0):
