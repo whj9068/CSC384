@@ -29,37 +29,107 @@ def compute_utility(board, color):
         return p2_count - p1_count
     
 # Better heuristic value of board
-def compute_heuristic(board, color): #not implemented, optional
-    #IMPLEMENT
-    return 0 #change this!
-
-def count_corner_captures(board, color):
-    rows = len(board)
-    cols = len(board[0]) if rows > 0 else 0
+def compute_heuristic(board, color):
+    # Determine the board size
+    board_size = len(board)
+    # Get the square weights for this board size
+    weights = get_square_weights(board_size)
     
-    # Dynamically determine corner positions based on board size
-    corners = [(0, 0), (0, cols-1), (rows-1, 0), (rows-1, cols-1)]    
-    captures = sum(1 for x, y in corners if board[x][y] == color)
-    return captures
+    # Calculate current mobility for the given color
+    current_mobility = count_mobility(board, color)
+    
+    # Calculate the sum of square weights for the given color's pieces
+    weight_sum = get_square_weight_sum(board, color, weights)
+    
+    # Optionally, you can include the opponent's mobility to penalize moves that increase opponent's mobility
+    opponent_color = 2 if color == 1 else 1
+    opponent_mobility = count_mobility(board, opponent_color)
+    
+    # Weight these factors (these weights can be adjusted based on strategy)
+    # This example assumes equal weighting for demonstration; adjust as needed
+    score = current_mobility - opponent_mobility + weight_sum
+    
+    return score
+
+#refered from https://reversiworld.wordpress.com/category/weighted-square-value/
+#with some modifications
+def get_square_weights(board_size):
+    if board_size == 8:
+        return [
+            120, -20, 20, 5, 5, 20, -20, 120,
+            -20, -40, -5, -5, -5, -5, -40, -20,
+            20, -5, 15, 3, 3, 15, -5, 20,
+            5, -5, 3, 3, 3, 3, -5, 5,
+            5, -5, 3, 3, 3, 3, -5, 5,
+            20, -5, 15, 3, 3, 15, -5, 20,
+            -20, -40, -5, -5, -5, -5, -40, -20,
+            120, -20, 20, 5, 5, 20, -20, 120
+        ]
+    elif board_size == 7:
+        return [
+            120, -30, 20, 20, 20, -30, 120,
+            -30, -50, -10, -10, -10, -50, -30,
+            20, -10, 5, 0, 5, -10, 20,
+            20, -10, 0, 10, 0, -10, 20,
+            20, -10, 5, 0, 5, -10, 20,
+            -30, -50, -10, -10, -10, -50, -30,
+            120, -30, 20, 20, 20, -30, 120,
+        ]
+    elif board_size == 6:
+        return [
+            120, -30, 20, 20, -30, 120,
+            -30, -50, -10, -10, -50, -30,
+            20, -10, 5, 5, -10, 20,
+            20, -10, 5, 5, -10, 20,
+            -30, -50, -10, -10, -50, -30,
+            120, -30, 20, 20, -30, 120
+        ]
+    elif board_size == 5:
+        return [
+            100, -20, 10, -20, 100,
+            -20, -40, -5, -40, -20,
+            10, -5, 0, -5, 10,
+            -20, -40, -5, -40, -20,
+            100, -20, 10, -20, 100
+        ]
+    elif board_size == 4:
+        return [
+            100, -10, -10, 100,
+            -10, -20, -20, -10,
+            -10, -20, -20, -10,
+            100, -10, -10, 100
+        ]
+
 
 def count_mobility(board, color):
     # Assuming get_possible_moves is a function that returns all legal moves for the given color
     return len(get_possible_moves(board, color))
 
+def get_square_weight_sum(board, color, weights):
+    # Calculate the sum of weights for the squares occupied by the given color
+    weight_sum = 0
+    for i in range(len(board)):
+        for j in range(len(board[i])):
+            if board[i][j] == color:  # Assuming the player's pieces are marked with 'color'
+                weight_sum += weights[i * len(board) + j]
+    return weight_sum
+
+def deep_copy_board(board):
+    # Assuming board is a tuple of tuples, this creates a deep copy of it
+    return tuple(tuple(row) for row in board)
+
 def evaluate_move(board, move, color):
-    # Apply the move to a copy of the board
-    new_board = play_move(board, color, move[0], move[1])
-    
-    # Calculate the difference in corner captures as a result of this move
-    corner_captures = count_corner_captures(new_board, color) - count_corner_captures(board, color)
-    
-    # Calculate the change in mobility as a result of this move
-    mobility = count_mobility(new_board, color) - count_mobility(board, color)
-    
-    # Weight these factors (these weights can be adjusted based on strategy)
-    score = 10 * corner_captures + mobility
-    
-    return score
+    # Create a copy of the board (assuming board is a list of lists or similar mutable structure)
+    new_board = deep_copy_board(board)
+    # Apply the move
+    # Note: You'll need to implement or adjust play_move to work with your board representation and ensure it modifies new_board
+    new_board = play_move(new_board, move[0], move[1], color)
+
+    # Compute the utility of the new board state for the player
+    utility = compute_heuristic(new_board, color)
+
+    return utility
+
 
 
 ############ MINIMAX ###############################
@@ -184,6 +254,7 @@ def alphabeta_min_node(board, color, alpha, beta, limit, caching = 0, ordering =
                 break
         if caching:
             cache[board_to_key(board)] = (best_move, min_utility)
+            
     return (best_move, min_utility)
 
 def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering = 0):
