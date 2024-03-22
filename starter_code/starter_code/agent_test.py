@@ -35,7 +35,7 @@ def compute_heuristic(board, color): #not implemented, optional
     #evaulate based on the own heuristic and add weight 
     size =  len(board)
     result = compute_utility(board, color)
-    if size<=6:
+    if size<6:
         return result
     result *= 70
 
