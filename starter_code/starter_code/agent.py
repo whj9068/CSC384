@@ -123,17 +123,16 @@ def deep_copy_board(board):
     # Assuming board is a tuple of tuples, this creates a deep copy of it
     return tuple(tuple(row) for row in board)
 
-def evaluate_move(board, move, color):
-    # Create a copy of the board (assuming board is a list of lists or similar mutable structure)
-    new_board = deep_copy_board(board)
-    # Apply the move
-    # Note: You'll need to implement or adjust play_move to work with your board representation and ensure it modifies new_board
-    new_board = play_move(new_board, move[0], move[1], color)
+def evaluate_move(board, moves, color):
+    new_board_list = []
+    board_move_dict = {}
+    for move in moves:
+        new_board = play_move(board, color, move[0], move[1])
+        new_board_list.append(new_board)
+        board_move_dict[new_board] = move
+    new_board_list.sort(key = lambda x: compute_heuristic(x, color),reverse=True)
+    return new_board_list, board_move_dict
 
-    # Compute the utility of the new board state for the player
-    utility = compute_heuristic(new_board, color)
-
-    return utility
 
 
 
@@ -248,7 +247,7 @@ def alphabeta_min_node(board, color, alpha, beta, limit, caching = 0, ordering =
     moves = get_possible_moves(board, opp_color)
     
     if ordering:
-        moves = sorted(moves, key=lambda move: evaluate_move(board, move, opp_color), reverse=False)
+        board_list, board_move_dict = evaluate_move(board, moves, color)
 
     if len(moves) == 0 or limit == 0:
         best_move = None
@@ -256,11 +255,11 @@ def alphabeta_min_node(board, color, alpha, beta, limit, caching = 0, ordering =
     else:
         best_move = None
         min_utility = float('inf')
-        for move in moves:
-            new_board = play_move(board, opp_color, move[0], move[1])
-            new_move = alphabeta_max_node(new_board, color, alpha, beta, limit-1, caching, ordering)
-            if new_move[1] < min_utility:
-                min_utility = new_move[1]
+        for board in board_list:
+            move = board_move_dict[board]
+            _, utility = alphabeta_max_node(board,color,alpha,beta,limit-1,caching,ordering)
+            if utility < min_utility:
+                min_utility = utility
                 best_move = move
             if min_utility <= alpha:
                 return (best_move, min_utility)
@@ -292,7 +291,8 @@ def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering =
     moves = get_possible_moves(board, color)
     
     if ordering:
-        moves = sorted(moves, key=lambda move: evaluate_move(board, move, color), reverse=True)
+    # Assuming evaluate_move has been adjusted to directly sort moves based on their evaluation
+        board_list, board_move_dict = evaluate_move(board, moves, color)
 
     
     if len(moves) == 0 or limit == 0:
@@ -302,13 +302,12 @@ def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering =
     else:
         best_move = None
         max_utility = float('-inf')
-        for move in moves:
-            # Play the move for the current player and evaluate
-            new_board = play_move(board, color, move[0], move[1])
+        for board in board_list:
+            move = board_move_dict[board]
             # Recursive call to evaluate the move, aiming to minimize the opponent's utility
-            new_move = alphabeta_min_node(new_board, color, alpha, beta, limit-1, caching, ordering)
-            if new_move[1] > max_utility:
-                max_utility = new_move[1]
+            _, utility = alphabeta_min_node(board, color, alpha, beta, limit-1, caching, ordering)
+            if utility > max_utility:
+                max_utility = utility
                 best_move = move
             alpha = max(alpha, max_utility)
             if alpha >= beta:
