@@ -142,9 +142,9 @@ def minimax_min_node(board, color, limit, caching=0):
     
     # Check if this state is in cache
     if caching and key in min_cache:
-        cached_depth, cached_value = min_cache[key]
-        if cached_depth <= limit:  # Prioritize shallower depths
-            return cached_value
+        #cached_depth, cached_value = min_cache[key]
+        #if cached_depth <= limit:  # Prioritize shallower depths
+        return min_cache[key]
     #IMPLEMENT (and replace the line below)
     if color == 1:
         opp_color = 2
@@ -171,8 +171,9 @@ def minimax_min_node(board, color, limit, caching=0):
                 min_utility = utility
                 best_move = move
         if caching:
-            if key not in min_cache or min_cache[key][0] > limit:  # Cache if deeper or not yet cached
-                min_cache[key] = (limit, (best_move, min_utility))
+            #if key not in min_cache or min_cache[key][0] > limit:  # Cache if deeper or not yet cached
+            #    min_cache[key] = (limit, (best_move, min_utility))
+            min_cache[key] = (best_move, min_utility)
         return (best_move, min_utility)
 
 
@@ -182,9 +183,10 @@ def minimax_max_node(board, color, limit, caching = 0): #returns highest possibl
     
     # Check if this state is in cache
     if caching and key in max_cache:
-        cached_depth, cached_value = max_cache[key]
-        if cached_depth <= limit:  # Prioritize shallower depths
-            return cached_value
+        #cached_depth, cached_value = max_cache[key]
+        #if cached_depth <= limit:  # Prioritize shallower depths
+        #    return cached_value
+        return max_cache[key]
 
     # Get possible moves for the current player, not the opponent.
     moves = get_possible_moves(board, color)
@@ -206,8 +208,9 @@ def minimax_max_node(board, color, limit, caching = 0): #returns highest possibl
                 max_utility = utility
                 best_move = move
         if caching:
-            if key not in max_cache or max_cache[key][0] > limit:  # Cache if deeper or not yet cached
-                max_cache[key] = (limit, (best_move, max_utility))
+            #if key not in max_cache or max_cache[key][0] > limit:  # Cache if deeper or not yet cached
+            #    max_cache[key] = (limit, (best_move, max_utility))
+            max_cache[key] = (best_move, max_utility)
         return (best_move, max_utility)
 
 
@@ -225,6 +228,8 @@ def select_move_minimax(board, color, limit, caching = 0):
     If caching is OFF (i.e. 0), do NOT use state caching to reduce the number of state evaluations.    
     """
     #IMPLEMENT (and replace the line below)
+    min_cache.clear()
+    max_cache.clear()
     move, _ = minimax_max_node(board, color, limit, caching)
     return move #change this!
 
@@ -235,9 +240,10 @@ def alphabeta_min_node(board, color, alpha, beta, limit, caching = 0, ordering =
     
     # Check if this state is in cache
     if caching and key in alpha_min_cache:
-        cached_depth, cached_value = alpha_min_cache[key]
-        if cached_depth <= limit:  # Prioritize shallower depths
-            return cached_value
+        #cached_depth, cached_value = alpha_min_cache[key]
+        #if cached_depth <= limit:  # Prioritize shallower depths
+        #    return cached_value
+        return alpha_min_cache[key]
     
     if color == 1:
         opp_color = 2
@@ -282,8 +288,9 @@ def alphabeta_min_node(board, color, alpha, beta, limit, caching = 0, ordering =
                 if alpha >= beta:
                     break
         if caching:
-            if key not in alpha_min_cache or alpha_min_cache[key][0] > limit:  # Cache if deeper or not yet cached
-                alpha_min_cache[key] = (limit, (best_move, min_utility))
+            #if key not in alpha_min_cache or alpha_min_cache[key][0] > limit:  # Cache if deeper or not yet cached
+            #    alpha_min_cache[key] = (limit, (best_move, min_utility))
+            alpha_min_cache[key] = (best_move, min_utility)
             
     return (best_move, min_utility)
 
@@ -293,9 +300,10 @@ def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering =
     
     # Check if this state is in cache
     if caching and key in alpha_max_cache:
-        cached_depth, cached_value = alpha_max_cache[key]
-        if cached_depth <= limit:  # Prioritize shallower depths
-            return cached_value
+        #cached_depth, cached_value = alpha_max_cache[key]
+        #if cached_depth <= limit:  # Prioritize shallower depths
+        #    return cached_value
+        return alpha_max_cache[key]
     
     if color == 1:
         opp_color = 2
@@ -341,8 +349,9 @@ def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering =
                 if alpha >= beta:
                     break
         if caching:
-            if key not in alpha_max_cache or alpha_max_cache[key][0] > limit:  # Cache if deeper or not yet cached
-                alpha_max_cache[key] = (limit, (best_move, max_utility))
+            #if key not in alpha_max_cache or alpha_max_cache[key][0] > limit:  # Cache if deeper or not yet cached
+            #    alpha_max_cache[key] = (limit, (best_move, max_utility))
+            alpha_max_cache[key] = (best_move, max_utility)
     return (best_move, max_utility)
 
 def select_move_alphabeta(board, color, limit, caching = 0, ordering = 0):
@@ -361,6 +370,8 @@ def select_move_alphabeta(board, color, limit, caching = 0, ordering = 0):
     If ordering is OFF (i.e. 0), do NOT use node ordering to expedite pruning and reduce the number of state evaluations. 
     """
     #IMPLEMENT (and replace the line below)
+    alpha_max_cache.clear()
+    alpha_min_cache.clear()
     move, utility = alphabeta_max_node(board, color, float('-inf'), float('inf'), limit, caching, ordering)
     return move #change this!
 
