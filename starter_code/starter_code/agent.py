@@ -253,19 +253,34 @@ def alphabeta_min_node(board, color, alpha, beta, limit, caching = 0, ordering =
         best_move = None
         min_utility = compute_utility(board, color)
     else:
-        best_move = None
-        min_utility = float('inf')
-        for board in board_list:
-            move = board_move_dict[board]
-            _, utility = alphabeta_max_node(board,color,alpha,beta,limit-1,caching,ordering)
-            if utility < min_utility:
-                min_utility = utility
-                best_move = move
-            if min_utility <= alpha:
-                return (best_move, min_utility)
-            beta = min(beta, min_utility)
-            if alpha >= beta:
-                break
+        if ordering:
+            best_move = None
+            min_utility = float('inf')
+            for board in board_list:
+                move = board_move_dict[board]
+                _, utility = alphabeta_max_node(board,color,alpha,beta,limit-1,caching,ordering)
+                if utility < min_utility:
+                    min_utility = utility
+                    best_move = move
+                if min_utility <= alpha:
+                    return (best_move, min_utility)
+                beta = min(beta, min_utility)
+                if alpha >= beta:
+                    break
+        else:
+            best_move = None
+            min_utility = float('inf')
+            for move in moves:
+                new_board = play_move(board, opp_color, move[0], move[1])
+                _, utility = alphabeta_max_node(new_board, color, alpha, beta, limit-1, caching, ordering)
+                if utility < min_utility:
+                    min_utility = utility
+                    best_move = move
+                if min_utility <= alpha:
+                    return (best_move, min_utility)
+                beta = min(beta, min_utility)
+                if alpha >= beta:
+                    break
         if caching:
             if key not in alpha_min_cache or alpha_min_cache[key][0] > limit:  # Cache if deeper or not yet cached
                 alpha_min_cache[key] = (limit, (best_move, min_utility))
@@ -300,18 +315,31 @@ def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering =
         max_utility = compute_utility(board, color)
         return (best_move, max_utility)
     else:
-        best_move = None
-        max_utility = float('-inf')
-        for board in board_list:
-            move = board_move_dict[board]
-            # Recursive call to evaluate the move, aiming to minimize the opponent's utility
-            _, utility = alphabeta_min_node(board, color, alpha, beta, limit-1, caching, ordering)
-            if utility > max_utility:
-                max_utility = utility
-                best_move = move
-            alpha = max(alpha, max_utility)
-            if alpha >= beta:
-                break
+        if ordering:
+            best_move = None
+            max_utility = float('-inf')
+            for board in board_list:
+                move = board_move_dict[board]
+                # Recursive call to evaluate the move, aiming to minimize the opponent's utility
+                _, utility = alphabeta_min_node(board, color, alpha, beta, limit-1, caching, ordering)
+                if utility > max_utility:
+                    max_utility = utility
+                    best_move = move
+                alpha = max(alpha, max_utility)
+                if alpha >= beta:
+                    break
+        else:
+            best_move = None
+            max_utility = float('-inf')
+            for move in moves:
+                new_board = play_move(board, color, move[0], move[1])
+                _, utility = alphabeta_min_node(new_board, color, alpha, beta, limit-1, caching, ordering)
+                if utility > max_utility:
+                    max_utility = utility
+                    best_move = move
+                alpha = max(alpha, max_utility)
+                if alpha >= beta:
+                    break
         if caching:
             if key not in alpha_max_cache or alpha_max_cache[key][0] > limit:  # Cache if deeper or not yet cached
                 alpha_max_cache[key] = (limit, (best_move, max_utility))
