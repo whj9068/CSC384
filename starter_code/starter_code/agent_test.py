@@ -5,347 +5,264 @@ An AI player for Othello.
 import random
 import sys
 import time
+import math
 
 # You can use the functions in othello_shared to write your AI
 from othello_shared import find_lines, get_possible_moves, get_score, play_move
 
-def eprint(*args, **kwargs): #you can use this for debugging, as it will print to sterr and not stdout
+cach = dict()
+
+
+def eprint(*args, **kwargs):  # you can use this for debugging, as it will print to sterr and not stdout
     print(*args, file=sys.stderr, **kwargs)
 
 
-#global variable
-min_caching = dict()
-max_caching = dict()
-alpha_caching = dict()
-beta_caching = dict()
-
 # Method to compute utility value of terminal state
 def compute_utility(board, color):
-    #IMPLEMENT
-    score = get_score(board)
-    
-    if color == 2:
-        return (score[1]-score[0])
-    else:
-        return (score[0]-score[1])
+    a, b = get_score(board)
+    return a - b if color == 1 else b - a
+
 
 
 # Better heuristic value of board
-def compute_heuristic(board, color): #not implemented, optional
-    #evaulate based on the own heuristic and add weight 
-    size =  len(board)
-    result = compute_utility(board, color)
-    if size<6:
-        return result
-    result *= 70
-
-    #evaulate based on the corner on the essential position of the board
-    opponent_color = get_opponent(color)
-    self_corner_weight = 5000
-    self_xsqr_weight = 400
-    self_csqr_weight = 220
-    self_asqr_weight = 70
-
-    oppo_corner_weight = 5000
-    oppo_xsqr_weight = 200
-    oppo_csqr_weight = 80
-    oppo_asqr_weight = 70
-
-   #get the value of each position
-    corner_list = [board[0][0],board[size-1][0],board[0][size-1],board[size-1][size-1]]
-    xsqr_list = [board[1][1],board[1][size-2],board[size-2][1],board[size-2][size-2]]
-    csqr_list = [board[1][0],board[0][1],board[0][size-2],board[size-2][0],board[size-1][1],board[1][size-1],board[size-2][size-1],board[size-1][size-2]]
-    asqr_list = [board[2][0],board[size-3][0],board[0][2],board[0][size-3],board[size-1][2],board[size-1][size-3],board[2][size-1],board[size-3][size-1]]
-    
-    for disk in corner_list:
-        if disk == color:
-            result+=self_corner_weight
-        elif disk==opponent_color:
-            result-=oppo_corner_weight
+def parity_heuristic(board, color):
+    """
+    Calculate the parity heuristic for a board state and player color.
+    This heuristic evaluates the difference in score between two players,
+    normalized by their total score, scaled to 100.
+    """
+    a, b = get_score(board)
+    c = a - b if color == 1 else b - a
+    return 100 * c / (a + b)
 
 
-    for disk in xsqr_list:
-        if disk == color:
-            result+=self_xsqr_weight
-        elif disk==opponent_color:
-            result-=oppo_xsqr_weight
+def mobility_heuristic(board, color):
+    """
+    Calculates the mobility heuristic for a given board and player color.
+    This heuristic evaluates the player's mobility (the number of possible moves)
+    relative to their opponent's, normalized and scaled to 100.
+    """
+    c2 = 3 - color
+    move1 = len(get_possible_moves(board, color))
+    move2 = len(get_possible_moves(board, c2))
+    s_move = move1 + move2
+    return 100 * (move1 - move2) / s_move if s_move > 0 else 0
 
-    for disk in csqr_list:
-        if disk == color:
-            result+=self_csqr_weight
-        elif disk==opponent_color:
-            result-=oppo_csqr_weight
+
+def corner_occupancy_heuristic(board, color):
+    """
+    Computes the corner occupancy heuristic for the given board and player color.
+    """
+    c2 = 3 - color
+    edge = [(0, 0), (0, len(board) - 1), (len(board) - 1, 0), (len(board) - 1, len(board) - 1)]
+    e1 = sum(1 for x, y in edge if board[y][x] == color)
+    e2 = sum(1 for x, y in edge if board[y][x] == c2)
+    return 25 * (e1 - e2)
+
+def corner_closeness_heuristic(board, color):
+    """
+    Computes the corner closeness heuristic for the given board and player color.
+    """
+    c2 = 3 - color
+    s1, s2 = calculate_star_points(board, color, c2)
+    return -12.5 * (s1 - s2)
+
+def calculate_star_points(board, color, opponent_color):
+    """
+    Helper function to calculate star points around the corners for the given board and player color.
+    """
+    l = len(board)
+    pts = [
+        (0, 1), (1, 0), (1, 1),
+        (0, l - 2), (1, l - 2), (1, l - 1),
+        (l - 2, 0), (l - 2, 1), (l - 1, 1),
+        (l - 2, l - 2), (l - 2, l - 1), (l - 1, l - 2)
+    ]
+
+    s1 = s2 = 0
+    for x, y in pts:
+        if board[y][x] == color:
+            s1 += 1
+        elif board[y][x] == opponent_color:
+            s2 += 1
+    return s1, s2
+
+def stability_heuristic(board, color):
+    """
+    Placeholder for the stability heuristic for the given board and player color.
+    """
+    # Implementing a full stability heuristic is complex and requires a detailed analysis
+    # of the board state to determine the stability of pieces.
+    # This placeholder returns 0 for simplicity.
+    return 0
+
+def compute_heuristic(board, color):
+    """
+    Computes the overall heuristic value based on multiple factors.
+    """
+    p = parity_heuristic(board, color)
+    m = mobility_heuristic(board, color)
+    corner = corner_occupancy_heuristic(board, color)
+    s = corner_closeness_heuristic(board, color)
+    stab = stability_heuristic(board, color)
+
+    # Adjust the weights as necessary based on game strategy and testing.
+    heuristic_value = 4 * s + 8 * corner + p + 2 * stab + 0.5 * m
+    return heuristic_value
 
 
-    for disk in asqr_list:
-        if disk == color:
-            result+=self_asqr_weight
-        elif disk==opponent_color:
-            result-=oppo_asqr_weight
+def ordering_board(board, color, pos_move):
+    b1 = dict()
+    for i in pos_move:
+        b2 = play_move(board, color, i[0], i[1])
+        u1 = compute_heuristic(b2, color)
+        b1.update({i: u1})
 
-    #add the value of the differnece in the number of moves 
-    own_move =len(get_possible_moves(board,color))
-    opponent_move = len(get_possible_moves(board,opponent_color))
+    u2 = sorted(b1.items(), key=lambda x: x[1], reverse=True)
+    mov = [i[0] for i in u2]
+    return mov
 
-    result+=(own_move-opponent_move)*70
-
-    #IMPLEMENT
-    return result
-
-#helper function for alpha beta pruning    
-#function to get the list of after move board
-def after_move_board_list(board,color,moves_list,ordering):
-    new_board_list = []
-    board_move_dict = {}
-    for move in moves_list:
-        new_board = play_move(board, color, move[0], move[1])
-        new_board_list.append(new_board)
-        board_move_dict[new_board] = move
-
-    if ordering == 1:
-        new_board_list.sort(key = lambda x: compute_heuristic(x, color),reverse=True)
-
-    return new_board_list,board_move_dict
-
-#function to get the opponent of the player
-def get_opponent(player):
-    if player == 1:
-        return 2
-    else:
-        return 1
 
 ############ MINIMAX ###############################
-def minimax_min_node(board, color, limit, caching = 0):
+def minimax_min_node(board, color, limit, caching=0):
+    b = tuple(map(tuple, board))  # Convert board to a hashable type for caching
+    if caching and (b in cach):
+        return cach[b]
 
-    #caching issue
-    board_key = tuple(tuple(row) for row in board)
+    c2 = 3 - color  # Switch player color
+    moves = get_possible_moves(board, c2)
+    if not moves or limit == 0:  # Check for terminal state or depth limit
+        return None, compute_utility(board, color)
 
-    # Check if the board state is in the cache
-    if caching and board_key in min_caching:
-        # Return the cached value
-        return min_caching[board_key]
+    min = float('inf')
+    for i in moves:
+        b2 = play_move(board, c2, i[0], i[1])
+        _, utility = minimax_max_node(b2, color, limit - 1, caching)
+        if utility < min:
+            min, bestmove = utility, i
 
-    #check if limit is 0
-    if limit == 0:
-        heu = compute_utility(board, color)
-        return (None, heu) 
+    if caching:
+        cach[b] = (bestmove, min)
 
+    return bestmove, min
 
-    best_move = None
-    minimum_utility = float('inf')
-    opponent_color = get_opponent(color)
+def minimax_max_node(board, color, limit, caching=0):
+    b = tuple(map(tuple, board))  # Convert board to a hashable type for caching
+    if caching and (b in cach):
+        return cach[b]
 
-    #get the move list for opponent
-    possbile_move_list = get_possible_moves(board,opponent_color)
-   
-   
-    #if no possible move return 
-    if len(possbile_move_list) == 0:
-        heu = compute_utility(board, color)
-        return (None, heu)  
+    moves = get_possible_moves(board, color)
+    if not moves or limit == 0:  # Check for terminal state or depth limit
+        return None, compute_utility(board, color)
 
+    max = float('-inf')
+    for move in moves:
+        b2 = play_move(board, color, move[0], move[1])
+        _, utility = minimax_min_node(b2, color, limit - 1, caching)
+        if utility > max:
+            max, bestmove = utility, move
 
-    for move in possbile_move_list:
+    if caching:
+        cach[b] = (bestmove, max)
 
-        after_move_board = play_move(board,opponent_color,move[0],move[1])
+    return bestmove, max
 
-        current_utility = minimax_max_node(after_move_board,color,limit-1,caching)[1]
+def select_move_minimax(board, color, limit, caching=0):
+    cach.clear()  # Clear the cache at the start of each move selection
+    mov, _ = minimax_max_node(board, color, limit, caching)
+    return mov
 
-        if current_utility<minimum_utility:
-            best_move,minimum_utility = move,current_utility
-            
-    
-        #caching the best move and the utility
-    if caching == 1:
-        min_caching[board_key] = (best_move,minimum_utility)
-
-    return (best_move,minimum_utility)
-
-def minimax_max_node(board, color, limit, caching = 0): #returns highest possible utility
-    #caching issue
-    board_key = tuple(tuple(row) for row in board)
-
-    # Check if the board state is in the cache
-    if caching and board_key in max_caching:
-        # Return the cached value
-        return max_caching[board_key]
-    
-    #if limit is 0
-    if limit == 0:
-        heu = compute_utility(board, color)
-        return (None, heu) 
-
-
-    best_move = (-1,-1)
-    maximum_utility = float('-inf')
-    opponent_color = get_opponent(color)
-
-    #get the move list
-    possbile_move_list = get_possible_moves(board,color)
-   
-    #if no possible move return 
-    if len(possbile_move_list) == 0 :
-        heu = compute_utility(board, color)
-        return (None, heu)  
-
-
-    for move in possbile_move_list:
-
-        after_move_board = play_move(board,color,move[0],move[1])
-
-        current_utility = minimax_min_node(after_move_board,color,limit-1,caching)[1]
-
-        if current_utility>maximum_utility:
-            best_move,maximum_utility = move,current_utility
-
-    #caching the best move and the utility
-    if caching == 1:
-        max_caching[board_key] = (best_move,maximum_utility)
-            
-    return (best_move,maximum_utility)
-
-
-def select_move_minimax(board, color, limit, caching = 0):
-    """
-    Given a board and a player color, decide on a move. 
-    The return value is a tuple of integers (i,j), where
-    i is the column and j is the row on the board.  
-
-    Note that other parameters are accepted by this function:
-    If limit is a positive integer, your code should enfoce a depth limit that is equal to the value of the parameter.
-    Search only to nodes at a depth-limit equal to the limit.  If nodes at this level are non-terminal return a heuristic 
-    value (see compute_utility)
-    If caching is ON (i.e. 1), use state caching to reduce the number of state evaluations.
-    If caching is OFF (i.e. 0), do NOT use state caching to reduce the number of state evaluations.    
-    """
-    #IMPLEMENT (and replace the line below)
-    min_caching.clear()
-    max_caching.clear()
-    return minimax_max_node(board, color, limit, caching)[0]
 
 ############ ALPHA-BETA PRUNING #####################
-def alphabeta_min_node(board, color, alpha, beta, limit, caching = 0, ordering = 0):
+def alphabeta_min_node(board, color, alpha, beta, limit, caching=0, ordering=0):
+    board = tuple(map(tuple, board))
+    if caching and (board in cach):
+        return cach[board]
 
-    #caching issue
-    board_key = tuple(tuple(row) for row in board)
+    if color == 1:
+        c2 = 2
+    else:
+        c2 = 1
 
-    # Check if the board state is in the cache
-    if caching and board_key in beta_caching:
-        # Return the cached value
-        return beta_caching[board_key]
-    
-    #check depth limit 
-    if limit == 0:
-        heu =  compute_utility(board, color)
-        return (None, heu)
+    best = None
+    moves = get_possible_moves(board, c2)
 
-    #IMPLEMENT (and replace the line below)
-    best_move = (-1,-1)
-    minimum_utility = float('inf')
-    opponent_color = get_opponent(color)
+    if not moves or limit == 0:
+        return best, compute_utility(board, color)
 
-    #get the move list
-    possbile_move_list = get_possible_moves(board,opponent_color)
-    
-    #check if there is possible move
-    if len(possbile_move_list) == 0:
-        heu = compute_utility(board, color)
-        return (None, heu)    
+    utility = float('inf')
 
+    for i in moves:
+        b2 = play_move(board, c2, i[0], i[1])
+        mov2, u2 = alphabeta_max_node(b2, color, alpha, beta, limit - 1, caching, ordering)
 
-    board_list,board_move_dict = after_move_board_list(board,opponent_color,possbile_move_list,ordering)
+        if caching:
+            b2 = tuple(map(tuple, b2))
+            cach.update({b2: (i, u2)})
+        if utility > u2:
+            utility, best = u2, i
+        if utility <= alpha:
+            return best, utility
+        beta = min(beta, utility)
 
-    #loop all the possible move and  recursively call the max node to get the utility
-    for after_move_board in board_list:
-        move = board_move_dict[after_move_board]
-        # after_move_board = play_move(board,opponent_color,move[0],move[1])
-        current_utility = alphabeta_max_node(after_move_board,color,alpha,beta,limit-1,caching,ordering)[1]
-      
-        if current_utility<minimum_utility:
-            best_move,minimum_utility = move,current_utility
-
-        beta = min(beta,minimum_utility)
-
-        if beta<=alpha:
-            break
-
-    #caching the best move and the utility
-    if caching == 1:
-        beta_caching[board_key] = (best_move,minimum_utility)
-
-    return best_move,minimum_utility
+    return best, utility
 
 
-def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering = 0):
-    #IMPLEMENT (and replace the line below)
-    #caching issue
-    board_key = tuple(tuple(row) for row in board)
+def alphabeta_max_node(board, color, alpha, beta, limit, caching=0, ordering=0):
+    board = tuple(map(tuple, board))
+    if caching and (board in cach):
+        return cach[board]
 
-    # Check if the board state is in the cache
-    if caching and board_key in alpha_caching:
-        # Return the cached value
-        return alpha_caching[board_key]
+    best = None
 
-    #check depth limit 
-    if limit == 0:
-        heu =  compute_utility(board, color)
-        return (None, heu)
-    
-    best_move = (-1,-1)
-    maximum_utility = float('-inf')
-    opponent_color = get_opponent(color)
-   
-    #get the move list
-    possbile_move_list = get_possible_moves(board,color)
+    moves = get_possible_moves(board, color)
 
-    #check if there is possible move
-    if len(possbile_move_list) == 0:
-        heu = compute_utility(board, color)
-        return (None, heu)    
-    
+    if not moves or limit == 0:
+        return best, compute_utility(board, color)
 
-    board_list,board_move_dict = after_move_board_list(board,color,possbile_move_list,ordering)
+    u = -float('inf')
 
-    #loop all the possible move and  recursively call the max node to get the utility
-    for after_move_board in board_list:
-        move = board_move_dict[after_move_board]
+    if ordering:
+        moves = ordering_board(board, color, moves)
 
-        current_utility = alphabeta_min_node(after_move_board,color,alpha,beta,limit-1,caching,ordering)[1]
-      
-        if current_utility>maximum_utility:
-            best_move,maximum_utility = move,current_utility
+    for i in moves:
+        b2 = play_move(board, color, i[0], i[1])
+        mov2, u2 = alphabeta_min_node(b2, color, alpha, beta, limit - 1, caching, ordering)
 
-        alpha = max(alpha,maximum_utility)
-
-        if beta<=alpha:
-            break
-
-    #caching the best move and the utility
-    if caching == 1:
-        alpha_caching[board_key] = (best_move,maximum_utility)
-
-    return best_move,maximum_utility
+        if caching:
+            b2 = tuple(map(tuple, b2))
+            cach.update({b2: (i, u2)})
+        if u < u2:
+            u, best = u2, i
+        if u >= beta:
+            return best, u
+        alpha = max(alpha, u)
+    return best, u
 
 
-def select_move_alphabeta(board, color, limit, caching = 0, ordering = 0):
+def select_move_alphabeta(board, color, limit, caching=0, ordering=0):
     """
-    Given a board and a player color, decide on a move. 
+    Given a board and a player color, decide on a move.
     The return value is a tuple of integers (i,j), where
-    i is the column and j is the row on the board.  
+    i is the column and j is the row on the board.
 
     Note that other parameters are accepted by this function:
     If limit is a positive integer, your code should enfoce a depth limit that is equal to the value of the parameter.
-    Search only to nodes at a depth-limit equal to the limit.  If nodes at this level are non-terminal return a heuristic 
+    Search only to nodes at a depth-limit equal to the limit.  If nodes at this level are non-terminal return a heuristic
     value (see compute_utility)
     If caching is ON (i.e. 1), use state caching to reduce the number of state evaluations.
-    If caching is OFF (i.e. 0), do NOT use state caching to reduce the number of state evaluations.    
-    If ordering is ON (i.e. 1), use node ordering to expedite pruning and reduce the number of state evaluations. 
-    If ordering is OFF (i.e. 0), do NOT use node ordering to expedite pruning and reduce the number of state evaluations. 
+    If caching is OFF (i.e. 0), do NOT use state caching to reduce the number of state evaluations.
+    If ordering is ON (i.e. 1), use node ordering to expedite pruning and reduce the number of state evaluations.
+    If ordering is OFF (i.e. 0), do NOT use node ordering to expedite pruning and reduce the number of state evaluations.
     """
-    #IMPLEMENT
-    alpha_caching.clear()
-    beta_caching.clear()
-    return alphabeta_max_node(board, color, float("-inf"), float("inf"), limit, caching, ordering)[0]
+    # IMPLEMENT (and replace the line below)
+    cach.clear()
+    alpha = -float('inf')
+    beta = float('inf')
+    mov, u = alphabeta_max_node(board, color, alpha, beta, limit, caching, ordering)
+    return mov
+
+
 
 ####################################################
 def run_ai():
@@ -355,30 +272,39 @@ def run_ai():
     Then it repeatedly receives the current score and current board state
     until the game is over.
     """
-    print("test AI") # First line is the name of this AI
+    print("Othello AI")  # First line is the name of this AI
     arguments = input().split(",")
-    
-    color = int(arguments[0]) #Player color: 1 for dark (goes first), 2 for light. 
-    limit = int(arguments[1]) #Depth limit
-    minimax = int(arguments[2]) #Minimax or alpha beta
-    caching = int(arguments[3]) #Caching 
-    ordering = int(arguments[4]) #Node-ordering (for alpha-beta only)
 
-    if (minimax == 1): eprint("Running MINIMAX")
-    else: eprint("Running ALPHA-BETA")
+    color = int(arguments[0])  # Player color: 1 for dark (goes first), 2 for light.
+    limit = int(arguments[1])  # Depth limit
+    minimax = int(arguments[2])  # Minimax or alpha beta
+    caching = int(arguments[3])  # Caching
+    ordering = int(arguments[4])  # Node-ordering (for alpha-beta only)
 
-    if (caching == 1): eprint("State Caching is ON")
-    else: eprint("State Caching is OFF")
+    if (minimax == 1):
+        eprint("Running MINIMAX")
+    else:
+        eprint("Running ALPHA-BETA")
 
-    if (ordering == 1): eprint("Node Ordering is ON")
-    else: eprint("Node Ordering is OFF")
+    if (caching == 1):
+        eprint("State Caching is ON")
+    else:
+        eprint("State Caching is OFF")
 
-    if (limit == -1): eprint("Depth Limit is OFF")
-    else: eprint("Depth Limit is ", limit)
+    if (ordering == 1):
+        eprint("Node Ordering is ON")
+    else:
+        eprint("Node Ordering is OFF")
 
-    if (minimax == 1 and ordering == 1): eprint("Node Ordering should have no impact on Minimax")
+    if (limit == -1):
+        eprint("Depth Limit is OFF")
+    else:
+        eprint("Depth Limit is ", limit)
 
-    while True: # This is the main loop
+    if (minimax == 1 and ordering == 1):
+        eprint("Node Ordering should have no impact on Minimax")
+
+    while True:  # This is the main loop
         # Read in the current game status, for example:
         # "SCORE 2 2" or "FINAL 33 31" if the game is over.
         # The first number is the score for player 1 (dark), the second for player 2 (light)
@@ -387,23 +313,24 @@ def run_ai():
         dark_score = int(dark_score_s)
         light_score = int(light_score_s)
 
-        if status == "FINAL": # Game is over.
+        if status == "FINAL":  # Game is over.
             print
         else:
-            board = eval(input()) # Read in the input and turn it into a Python
-                                  # object. The format is a list of rows. The
-                                  # squares in each row are represented by
-                                  # 0 : empty square
-                                  # 1 : dark disk (player 1)
-                                  # 2 : light disk (player 2)
+            board = eval(input())  # Read in the input and turn it into a Python
+            # object. The format is a list of rows. The
+            # squares in each row are represented by
+            # 0 : empty square
+            # 1 : dark disk (player 1)
+            # 2 : light disk (player 2)
 
             # Select the move and send it to the manager
-            if (minimax == 1): #run this if the minimax flag is given
+            if (minimax == 1):  # run this if the minimax flag is given
                 movei, movej = select_move_minimax(board, color, limit, caching)
-            else: #else run alphabeta
+            else:  # else run alphabeta
                 movei, movej = select_move_alphabeta(board, color, limit, caching, ordering)
-            
+
             print("{} {}".format(movei, movej))
+
 
 if __name__ == "__main__":
     run_ai()
