@@ -30,9 +30,9 @@ def compute_utility(board, color):
         return p1_count - p2_count
     else:
         return p2_count - p1_count
-    
+
 # Better heuristic value of board
-def compute_heuristic(board, color):
+def compute_heuristic(board, color): #not implemented, optional
     # Determine the board size
     board_size = len(board)
     # Get the square weights for this board size
@@ -135,9 +135,8 @@ def evaluate_move(board, moves, color):
 
 
 
-
 ############ MINIMAX ###############################
-def minimax_min_node(board, color, limit, caching=0):
+def minimax_min_node(board, color, limit, caching = 0):
     key = board_to_key(board)
     
     # Check if this state is in cache
@@ -212,7 +211,6 @@ def minimax_max_node(board, color, limit, caching = 0): #returns highest possibl
             #    max_cache[key] = (limit, (best_move, max_utility))
             max_cache[key] = (best_move, max_utility)
         return (best_move, max_utility)
-
 
 def select_move_minimax(board, color, limit, caching = 0):
     """
