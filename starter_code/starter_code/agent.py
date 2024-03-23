@@ -15,7 +15,7 @@ alpha_max_cache = {}
 alpha_min_cache = {}
 
 def board_to_key(board):
-    # Flatten the board into a single tuple since tuples are hashable and can be used as dictionary keys
+    #change the board into a type that can be used as dictionary keys
     return tuple(item for row in board for item in row)
 
 def eprint(*args, **kwargs): #you can use this for debugging, as it will print to sterr and not stdout
@@ -24,8 +24,9 @@ def eprint(*args, **kwargs): #you can use this for debugging, as it will print t
 # Method to compute utility value of terminal state
 def compute_utility(board, color):
     #IMPLEMENT
-    #number of hectares they own minus the number of hectares their competitor owns
+    #number own minus number of opponent
     p1_count, p2_count = get_score(board)
+
     if color == 1:
         return p1_count - p2_count
     else:
@@ -35,28 +36,32 @@ def compute_utility(board, color):
 def compute_heuristic(board, color): #not implemented, optional
     # Determine the board size
     board_size = len(board)
-    # Get the square weights for this board size
+
+    #get the static weights for this board size
     weights = get_square_weights(board_size)
     
-    # Calculate current mobility for the given color
+    #calculate current mobility for self
     current_mobility = count_mobility(board, color)
     
-    # Calculate the sum of square weights for the given color's pieces
+    #calculate the sum of square weights for the current board state
     weight_sum = get_square_weight_sum(board, color, weights)
     
-    # Optionally, you can include the opponent's mobility to penalize moves that increase opponent's mobility
-    opponent_color = 2 if color == 1 else 1
-    opponent_mobility = count_mobility(board, opponent_color)
+    #calculate opponent mobility
+    if color == 1:
+        opp_color = 2
+    else:
+        opp_color = 1
+    opponent_mobility = count_mobility(board, opp_color)
     
-    # Weight these factors (these weights can be adjusted based on strategy)
-    # This example assumes equal weighting for demonstration; adjust as needed
+    #add weights to mobility
+    #adjust weight for each component based on test trials
     score = (current_mobility-opponent_mobility)*70 + (weight_sum*40)
     
     return score
 
-#refered from https://reversiworld.wordpress.com/category/weighted-square-value/
-#with some modifications
 def get_square_weights(board_size):
+    #refered from https://reversiworld.wordpress.com/category/weighted-square-value/
+    #with some modifications
     if board_size == 8:
         return [
             120, -20, 20, 5, 5, 20, -20, 120,
@@ -68,6 +73,7 @@ def get_square_weights(board_size):
             -20, -40, -5, -5, -5, -5, -40, -20,
             120, -20, 20, 5, 5, 20, -20, 120
         ]
+    
     elif board_size == 7:
         return [
             120, -30, 20, 20, 20, -30, 120,
@@ -78,6 +84,7 @@ def get_square_weights(board_size):
             -30, -50, -10, -10, -10, -50, -30,
             120, -30, 20, 20, 20, -30, 120,
         ]
+    
     elif board_size == 6:
         return [
             120, -30, 20, 20, -30, 120,
@@ -87,6 +94,7 @@ def get_square_weights(board_size):
             -30, -50, -10, -10, -50, -30,
             120, -30, 20, 20, -30, 120
         ]
+    
     elif board_size == 5:
         return [
             100, -20, 10, -20, 100,
@@ -95,6 +103,7 @@ def get_square_weights(board_size):
             -20, -40, -5, -40, -20,
             100, -20, 10, -20, 100
         ]
+    
     elif board_size == 4:
         return [
             100, -10, -10, 100,
@@ -103,112 +112,132 @@ def get_square_weights(board_size):
             100, -10, -10, 100
         ]
 
-
 def count_mobility(board, color):
-    # Assuming get_possible_moves is a function that returns all legal moves for the given color
+    #returns number of all legal moves for the given color
     return len(get_possible_moves(board, color))
 
 def get_square_weight_sum(board, color, weights):
-    # Calculate the sum of weights for the squares occupied by the given color
+    #calculate the sum of weights for the squares
+    #weight = all self weight - all opponent weight
     weight_sum = 0
     for i in range(len(board)):
         for j in range(len(board[i])):
-            if board[i][j] == color:  # Assuming the player's pieces are marked with 'color'
+            #self weight
+            if board[i][j] == color: 
                 weight_sum += weights[i * len(board) + j]
+            #opponent weight
             elif board[i][j] == 3 - color:
                 weight_sum -= weights[i * len(board) + j]
     return weight_sum
 
-def deep_copy_board(board):
-    # Assuming board is a tuple of tuples, this creates a deep copy of it
-    return tuple(tuple(row) for row in board)
+def evaluate_move_max(board, moves, color):
+    # List to hold tuples of (utility, new board, move)
+    move_evaluations = []
 
-def evaluate_move(board, moves, color):
-    new_board_list = []
-    board_move_dict = {}
     for move in moves:
         new_board = play_move(board, color, move[0], move[1])
-        new_board_list.append(new_board)
-        board_move_dict[new_board] = move
-    new_board_list.sort(key = lambda x: compute_heuristic(x, color),reverse=True)
-    return new_board_list, board_move_dict
+        utility = compute_heuristic(new_board, color)
+        move_evaluations.append((utility, new_board, move))
+    
+    # Sort the list of tuples by utility in descending order
+    # This puts the best moves according to the heuristic at the front of the list
+    move_evaluations.sort(key=lambda x: x[0], reverse=True)
+    return move_evaluations
 
+def evaluate_move_min(board, moves, color):
+    # List to hold tuples of (utility, new board, move)
+    move_evaluations = []
+
+    for move in moves:
+        new_board = play_move(board, color, move[0], move[1])
+        utility = compute_heuristic(new_board, color)
+        move_evaluations.append((utility, new_board, move))
+    
+    # Sort the list of tuples by utility in descending order
+    # This puts the best moves according to the heuristic at the front of the list
+    move_evaluations.sort(key=lambda x: x[0], reverse=True)
+    return move_evaluations
 
 
 ############ MINIMAX ###############################
 def minimax_min_node(board, color, limit, caching = 0):
+    #IMPLEMENT (and replace the line below)
+    #transform board to type that can be stored as key in dict
     key = board_to_key(board)
     
-    # Check if this state is in cache
+    #check if this state is in cache already
+    #if so, return
     if caching and key in min_cache:
-        #cached_depth, cached_value = min_cache[key]
-        #if cached_depth <= limit:  # Prioritize shallower depths
         return min_cache[key]
-    #IMPLEMENT (and replace the line below)
+    
+    #get opponent color
     if color == 1:
         opp_color = 2
     else:
         opp_color = 1
 
-    # Get possible moves for the current player, not the opponent.
+    #get possible moves for the current player
     moves = get_possible_moves(board, opp_color)
+
     if len(moves) == 0 or limit == 0:
-        # No further moves to evaluate or depth limit reached, compute utility for the current state.
+        #no further moves to evaluate or depth limit reached, compute utility for the current state.
         best_move = None
         min_utility = compute_utility(board, color)
         return (best_move, min_utility)
     else:
         best_move = None
         min_utility = float('inf')
+
+        #traverse through every avaliable moves
         for move in moves:
-            # Play the move for the current player and evaluate.
+            #play the move for the opponent and evaluate.
             new_board = play_move(board, opp_color, move[0], move[1])
-            # Recursive call to evaluate the move, using the opponent's color for the next level.
+            #recursive call to evaluate the move, using the self's color for the next level.
             _ , utility = minimax_max_node(new_board, color, limit-1, caching)
-            # If the utility from this move is less than the current minimum, update the minimum.
+            #if the utility from this move is less than the current minimum, update the minimum.
             if utility < min_utility:
                 min_utility = utility
                 best_move = move
+        #save into cache
         if caching:
-            #if key not in min_cache or min_cache[key][0] > limit:  # Cache if deeper or not yet cached
-            #    min_cache[key] = (limit, (best_move, min_utility))
             min_cache[key] = (best_move, min_utility)
         return (best_move, min_utility)
 
 
 def minimax_max_node(board, color, limit, caching = 0): #returns highest possible utility
     #IMPLEMENT (and replace the line below)
+    #transform board to type that can be stored as key in dict
     key = board_to_key(board)
     
-    # Check if this state is in cache
+    #check if this state is in cache already
+    #if so, return
     if caching and key in max_cache:
-        #cached_depth, cached_value = max_cache[key]
-        #if cached_depth <= limit:  # Prioritize shallower depths
-        #    return cached_value
         return max_cache[key]
 
-    # Get possible moves for the current player, not the opponent.
+    #get possible moves for the current player
     moves = get_possible_moves(board, color)
+
     if len(moves) == 0 or limit == 0:
-        # No further moves to evaluate or depth limit reached, compute utility for the current state.
+        #no further moves to evaluate or depth limit reached, compute utility for the current state.
         best_move = None
         max_utility = compute_utility(board, color)
         return (best_move, max_utility)
     else:
         best_move = None
         max_utility = float('-inf')
+
+        #traverse through every avaliable moves
         for move in moves:
-            # Play the move for the current player and evaluate.
+            #play the move for the current player and evaluate.
             new_board = play_move(board, color, move[0], move[1])
-            # Recursive call to evaluate the move, using the opponent's color for the next level.
+            #recursive call to evaluate the move, using the self's color for the next level.
             _, utility = minimax_min_node(new_board, color, limit-1, caching)
-            # If the utility from this move is greater than the current maximum, update the maximum.
+            #if the utility from this move is greater than the current maximum, update the maximum.
             if utility > max_utility:
                 max_utility = utility
                 best_move = move
+        #save into cache
         if caching:
-            #if key not in max_cache or max_cache[key][0] > limit:  # Cache if deeper or not yet cached
-            #    max_cache[key] = (limit, (best_move, max_utility))
             max_cache[key] = (best_move, max_utility)
         return (best_move, max_utility)
 
@@ -234,62 +263,81 @@ def select_move_minimax(board, color, limit, caching = 0):
 ############ ALPHA-BETA PRUNING #####################
 def alphabeta_min_node(board, color, alpha, beta, limit, caching = 0, ordering = 0):
     #IMPLEMENT (and replace the line below)
+    #transform board to type that can be stored as key in dict
     key = board_to_key(board)
     
-    # Check if this state is in cache
+    #check if this state is in cache already
+    #if so, return
     if caching and key in alpha_min_cache:
-        #cached_depth, cached_value = alpha_min_cache[key]
-        #if cached_depth <= limit:  # Prioritize shallower depths
-        #    return cached_value
         return alpha_min_cache[key]
     
+    #get opponent color
     if color == 1:
         opp_color = 2
     else:
         opp_color = 1
-    
+
+    #get possible moves for the current player
     moves = get_possible_moves(board, opp_color)
     
+    #get the ordered boards and moves
     if ordering:
-        board_list, board_move_dict = evaluate_move(board, moves, color)
+        evaluate_moves = evaluate_move_min(board, moves, color)
 
     if len(moves) == 0 or limit == 0:
+        #no further moves to evaluate or depth limit reached, compute utility for the current state.
         best_move = None
         min_utility = compute_utility(board, color)
     else:
         if ordering:
+            #with ordering
             best_move = None
             min_utility = float('inf')
-            for board in board_list:
-                move = board_move_dict[board]
-                _, utility = alphabeta_max_node(board,color,alpha,beta,limit-1,caching,ordering)
+
+            for e in evaluate_moves:
+                #traverse boards by utility ranking
+                move = e[2]
+                #recursive call to evaluate the move
+                _, utility = alphabeta_max_node(e[1],color,alpha,beta,limit-1,caching,ordering)
+                #if the utility from this move is less than the current minimum, update the minimum.
                 if utility < min_utility:
                     min_utility = utility
                     best_move = move
+                #pruning
                 if min_utility <= alpha:
                     return (best_move, min_utility)
+                #update beta
                 beta = min(beta, min_utility)
+                #pruning
                 if alpha >= beta:
                     break
         else:
+            #without ordering
             best_move = None
             min_utility = float('inf')
+            #traverse through every avaliable moves
+
             for move in moves:
+                #play the move for the opponent and evaluate.
                 new_board = play_move(board, opp_color, move[0], move[1])
+                #recursive call to evaluate the move
                 _, utility = alphabeta_max_node(new_board, color, alpha, beta, limit-1, caching, ordering)
+                #if the utility from this move is less than the current minimum, update the minimum.
                 if utility < min_utility:
                     min_utility = utility
                     best_move = move
+                #pruning
                 if min_utility <= alpha:
                     return (best_move, min_utility)
+                #update beta
                 beta = min(beta, min_utility)
+                #pruning
                 if alpha >= beta:
                     break
+
+        #save into cache
         if caching:
-            #if key not in alpha_min_cache or alpha_min_cache[key][0] > limit:  # Cache if deeper or not yet cached
-            #    alpha_min_cache[key] = (limit, (best_move, min_utility))
             alpha_min_cache[key] = (best_move, min_utility)
-            
     return (best_move, min_utility)
 
 def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering = 0):
@@ -297,58 +345,69 @@ def alphabeta_max_node(board, color, alpha, beta, limit, caching = 0, ordering =
     key = board_to_key(board)
     
     # Check if this state is in cache
+    #if so, return
     if caching and key in alpha_max_cache:
-        #cached_depth, cached_value = alpha_max_cache[key]
-        #if cached_depth <= limit:  # Prioritize shallower depths
-        #    return cached_value
         return alpha_max_cache[key]
     
+    # Get opponent color
     if color == 1:
         opp_color = 2
     else:
         opp_color = 1
 
-    # Generate and evaluate moves for the current player (color)
+    # Generate and evaluate moves for the current player
     moves = get_possible_moves(board, color)
     
     if ordering:
-    # Assuming evaluate_move has been adjusted to directly sort moves based on their evaluation
-        board_list, board_move_dict = evaluate_move(board, moves, color)
+        # Assuming evaluate_move has been adjusted to directly sort moves based on their evaluation
+        evaluate_moves = evaluate_move_max(board, moves, color)
 
-    
+    # If no moves or depth limit reached, compute utility for the current state
     if len(moves) == 0 or limit == 0:
         best_move = None
         max_utility = compute_utility(board, color)
         return (best_move, max_utility)
     else:
         if ordering:
+            # With ordering
             best_move = None
             max_utility = float('-inf')
-            for board in board_list:
-                move = board_move_dict[board]
-                # Recursive call to evaluate the move, aiming to minimize the opponent's utility
-                _, utility = alphabeta_min_node(board, color, alpha, beta, limit-1, caching, ordering)
+            # Traverse boards by utility ranking
+            for e in evaluate_moves:
+                move = e[2]
+                # Recursive call to evaluate the move
+                _, utility = alphabeta_min_node(e[1], color, alpha, beta, limit-1, caching, ordering)
+                # If the utility from this move is greater than the current maximum, update the maximum
                 if utility > max_utility:
                     max_utility = utility
                     best_move = move
+                # Pruning
                 alpha = max(alpha, max_utility)
+                # Update beta
                 if alpha >= beta:
                     break
         else:
+            # Without ordering
             best_move = None
             max_utility = float('-inf')
+            # Traverse through every available moves
             for move in moves:
+                # Play the move for the current player and evaluate
                 new_board = play_move(board, color, move[0], move[1])
+                # Recursive call to evaluate the move
                 _, utility = alphabeta_min_node(new_board, color, alpha, beta, limit-1, caching, ordering)
+                # If the utility from this move is greater than the current maximum, update the maximum
                 if utility > max_utility:
                     max_utility = utility
                     best_move = move
+                # Pruning
                 alpha = max(alpha, max_utility)
+                # Update beta
                 if alpha >= beta:
                     break
+
+        # Save into cache
         if caching:
-            #if key not in alpha_max_cache or alpha_max_cache[key][0] > limit:  # Cache if deeper or not yet cached
-            #    alpha_max_cache[key] = (limit, (best_move, max_utility))
             alpha_max_cache[key] = (best_move, max_utility)
     return (best_move, max_utility)
 
@@ -370,7 +429,7 @@ def select_move_alphabeta(board, color, limit, caching = 0, ordering = 0):
     #IMPLEMENT (and replace the line below)
     alpha_max_cache.clear()
     alpha_min_cache.clear()
-    move, utility = alphabeta_max_node(board, color, float('-inf'), float('inf'), limit, caching, ordering)
+    move, _ = alphabeta_max_node(board, color, float('-inf'), float('inf'), limit, caching, ordering)
     return move #change this!
 
 ####################################################
